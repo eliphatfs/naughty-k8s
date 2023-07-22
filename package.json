@@ -14,10 +14,42 @@
   "contributes": {
     "commands": [
       {
-        "command": "naughty-k8s.helloWorld",
-        "title": "Hello World"
+        "command": "naughty-k8s.res.refresh",
+        "title": "Refresh Kubernetes Resources",
+        "icon": "$(extensions-refresh)"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "naughty-k8s.res.refresh",
+          "when": "view == naughty-k8s.res",
+          "group": "navigation"
+        }
+      ]
+    },
+    "views": {
+      "naughty-k8s-exp": [
+        {
+          "id": "naughty-k8s.cfg",
+          "name": "Configuration",
+          "initialSize": 2
+        },
+        {
+          "id": "naughty-k8s.res",
+          "name": "Resources"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "naughty-k8s-exp",
+          "title": "naughty-k8s",
+          "icon": "media/nautilus.svg"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "yarn run compile",
@@ -28,16 +60,20 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/vscode": "^1.76.0",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "20.2.5",
+    "@types/vscode": "^1.76.0",
     "@typescript-eslint/eslint-plugin": "^5.59.8",
     "@typescript-eslint/parser": "^5.59.8",
+    "@vscode/test-electron": "^2.3.2",
     "eslint": "^8.41.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
-    "typescript": "^5.1.3",
-    "@vscode/test-electron": "^2.3.2"
+    "typescript": "^5.1.3"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "yaml": "^2.3.1"
   }
 }

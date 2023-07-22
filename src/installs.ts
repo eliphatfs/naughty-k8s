@@ -4,7 +4,7 @@ import { systemAsync } from './utils';
 const link = "https://kubernetes.io/docs/tasks/tools/";
 
 function showError(what: string) {
-    vscode.window.showWarningMessage(
+    vscode.window.showErrorMessage(
         `${what} not found. Please install kubectl and kubectl convert plugin according to ${link}`,
         "Open Instructions"
     ).then(selected => {
