@@ -22,6 +22,10 @@
         "command": "naughty-k8s.proxy.restart",
         "title": "Restart Kubernetes Backend",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "naughty-k8s.pod.test",
+        "title": "Test Pod"
       }
     ],
     "menus": {
@@ -30,6 +34,12 @@
           "command": "naughty-k8s.res.refresh",
           "when": "view == naughty-k8s.res",
           "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "naughty-k8s.pod.test",
+          "when": "view == naughty-k8s.res && viewItem == running"
         }
       ]
     },
@@ -58,9 +68,9 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "yarn run compile",
+    "vscode:prepublish": "yarn run production",
+    "production": "NODE_ENV=production node ./esbuild.js",
     "compile": "node ./esbuild.js",
-    "watch": "tsc -watch -p ./",
     "pretest": "yarn run compile && yarn run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js"

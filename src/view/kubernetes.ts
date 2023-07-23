@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { listPods } from '../api/pod';
+import { listPods, BackedPodCommandStream } from '../api/pod';
 import { html } from './webviews';
 
 class KubernetesConfigProvider implements vscode.WebviewViewProvider {
@@ -39,7 +39,8 @@ class PodItem extends vscode.TreeItem {
     constructor(name: string, status: string, collapsibleState: vscode.TreeItemCollapsibleState) {
         super(`${name} (${status})`, collapsibleState);
         this.name = name;
-        switch (status.toLowerCase()) {
+        this.contextValue = status.toLowerCase();
+        switch (this.contextValue) {
             case "running":
                 this.iconPath = new vscode.ThemeIcon("gear~spin", new vscode.ThemeColor("testing.runAction"));
                 break;
@@ -100,7 +101,12 @@ export default class KubernetesView {
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider('naughty-k8s.cfg', cfgProvider),
             vscode.window.registerTreeDataProvider('naughty-k8s.res', provider),
-            vscode.commands.registerCommand("naughty-k8s.res.refresh", () => provider.refresh())
+            vscode.commands.registerCommand("naughty-k8s.res.refresh", () => provider.refresh()),
+            vscode.commands.registerCommand("naughty-k8s.pod.test", async (podItem: PodItem) => {
+                let stream = await new BackedPodCommandStream(podItem.name).open();
+                console.log(await stream.run({ cmd: "ls", p: "/" }));
+                await stream.close();
+            })
         );
     }
 }

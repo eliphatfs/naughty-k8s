@@ -1,7 +1,6 @@
 import { ChildProcess, exec } from "child_process";
 import * as vscode from "vscode";
 import * as k8s from '@kubernetes/client-node';
-import { callAsync } from "../utils";
 
 interface Configuration {
     port: number,
@@ -24,16 +23,15 @@ if (!defaultNamespace?.namespace)
 type ApiCtor<T> = new (server: string) => T;
 
 export const activeProxy: Configuration = {
-    port: 0, namespace: defaultNamespace?.namespace ?? 'default', spawn: null, kc,
+    port: 0, namespace: defaultNamespace?.namespace ?? 'default', spawn: null, kc
 };
 
 export function make<T extends k8s.ApiType>(T: ApiCtor<T>): T {
-    const k8sApi = new T(`http://127.0.0.1:${activeProxy.port}/`);
-    k8sApi.setDefaultAuthentication(kc);
-    return k8sApi;
+    return new T(`http://127.0.0.1:${activeProxy.port}`);
 }
 
 export function ns() { return activeProxy.namespace; }
+export function kube() { return activeProxy.kc; }
 
 export async function startProxy(context: vscode.ExtensionContext): Promise<number> {
     let port = await new Promise<number>(resolve => {
@@ -56,6 +54,13 @@ export async function startProxy(context: vscode.ExtensionContext): Promise<numb
         context.subscriptions.push(sub);
     });
     activeProxy.port = port;
+    for (let i = 0; i < kc.clusters.length; i++) {
+        if (kc.clusters[i].name === kc.getCurrentCluster()?.name) {
+            (kc.clusters[i] as any).server = `http://127.0.0.1:${activeProxy.port}`;
+            (kc.clusters[i] as any).skipTLSVerify = true;
+            break;
+        }
+    }
     console.log(`kubectl backend daemon on port ${port}`);
     return port;
 }
