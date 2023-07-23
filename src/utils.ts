@@ -4,6 +4,17 @@ export function delay(ms: number) {
     return new Promise<void>((resolve) => setTimeout(() => resolve(), ms));
 }
 
+export function throttled(action: () => void, minDelay: number) {
+    let flag = false;
+    return () => {
+        flag = true;
+        setTimeout(() => {
+            if (flag) action();
+            flag = false;
+        }, minDelay);
+    }
+}
+
 export function callAsync(cmd: string) {
     return new Promise<{code: number, stdout: string, stderr: string}>(resolve => {
         exec(cmd, (error, stdout, stderr) => {
