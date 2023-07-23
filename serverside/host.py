@@ -28,6 +28,8 @@ def main(dispatcher=dispatcher):
             r = dispatcher[line['cmd']](**line)
             r['result'] = 'I'
             print(json.dumps(r))
+        except EOFError:
+            return
         except Exception as exc:
             print(json.dumps({"result": "E", "msg": str(exc)}))
 
