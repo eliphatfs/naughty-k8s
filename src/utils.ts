@@ -1,5 +1,9 @@
 import { exec } from 'child_process';
 
+export function delay(ms: number) {
+    return new Promise<void>((resolve) => setTimeout(() => resolve(), ms));
+}
+
 export function callAsync(cmd: string) {
     return new Promise<{code: number, stdout: string, stderr: string}>(resolve => {
         exec(cmd, (error, stdout, stderr) => {
