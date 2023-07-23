@@ -54,13 +54,13 @@ export async function startProxy(context: vscode.ExtensionContext): Promise<numb
         context.subscriptions.push(sub);
     });
     activeProxy.port = port;
-    for (let i = 0; i < kc.clusters.length; i++) {
-        if (kc.clusters[i].name === kc.getCurrentCluster()?.name) {
-            (kc.clusters[i] as any).server = `http://127.0.0.1:${activeProxy.port}`;
-            (kc.clusters[i] as any).skipTLSVerify = true;
-            break;
-        }
-    }
+    kc.loadFromClusterAndUser({
+        server: `http://127.0.0.1:${activeProxy.port}`,
+        skipTLSVerify: true,
+        name: 'daemon'
+    }, {
+        name: ''
+    })
     console.log(`kubectl backend daemon on port ${port}`);
     return port;
 }
