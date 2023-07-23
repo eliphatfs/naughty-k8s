@@ -2,7 +2,15 @@ import * as vscode from 'vscode';
 import * as api from '.';
 
 interface PodModel {
-    metadata: { name: string }
+    metadata: {
+        name: string
+    },
+    status: {
+        phase: string,
+        hostIP: string,
+        podIP: string,
+    },
+    startTime: string
 }
 
 export async function listPods(): Promise<PodModel[]> {
