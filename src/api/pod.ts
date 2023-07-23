@@ -1,19 +1,22 @@
 import * as vscode from 'vscode';
 import * as api from '.';
+import * as k8s from '@kubernetes/client-node';
 
-interface PodModel {
-    metadata: {
-        name: string
-    },
-    status: {
-        phase: string,
-        hostIP: string,
-        podIP: string,
-    },
-    startTime: string
+
+export async function listPods(): Promise<k8s.V1Pod[]> {
+    const k8sApi = api.make(k8s.CoreV1Api);
+    const resp = await k8sApi.listNamespacedPod(api.ns());
+    return resp.body.items;
 }
 
-export async function listPods(): Promise<PodModel[]> {
-    const resp = await api.client.get(`/api/v1/namespaces/${api.ns()}/pods`);
-    return resp.data.items;
+class NoncePodCommandStream {
+    name: string
+
+    constructor(name: string) {
+        this.name = name
+    }
+
+    close() {
+
+    }
 }

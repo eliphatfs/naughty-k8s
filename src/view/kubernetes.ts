@@ -34,8 +34,11 @@ class KubernetesConfigProvider implements vscode.WebviewViewProvider {
 }
 
 class PodItem extends vscode.TreeItem {
+    name: string
+
     constructor(name: string, status: string, collapsibleState: vscode.TreeItemCollapsibleState) {
         super(`${name} (${status})`, collapsibleState);
+        this.name = name;
         switch (status.toLowerCase()) {
             case "running":
                 this.iconPath = new vscode.ThemeIcon("gear~spin", new vscode.ThemeColor("testing.runAction"));
