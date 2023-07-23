@@ -24,6 +24,20 @@ export async function listPods(): Promise<k8s.V1Pod[]> {
     return resp.body.items;
 }
 
+
+export async function getLogStream(podName: string) {
+    const ps = new stream.PassThrough({ encoding: 'utf-8' });
+    const logApi = await new k8s.Log(api.kube()).log(api.ns(), podName, '', ps, {
+        follow: true
+    });
+    ps.on('close', () => {
+        console.log("POD LOG STREAM CLOSED");
+        logApi.abort();
+    });
+    return ps;
+}
+
+
 export class BackedPodCommandStream {
     name: string
     stdin: stream.PassThrough
@@ -71,7 +85,7 @@ export class BackedPodCommandStream {
     }
 
     async close() {
-        this.stdin.push(null);
+        this.stdin.end();
         await delay(1000);
         this.ws?.close();
     }

@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
-import { listPods, BackedPodCommandStream } from '../api/pod';
+import { listPods, BackedPodCommandStream, getLogStream } from '../api/pod';
 import { html } from './webviews';
+import { PassThrough } from 'stream';
+import { throttled } from '../utils';
+
 
 class KubernetesConfigProvider implements vscode.WebviewViewProvider {
     tree: KubernetesTreeProvider
@@ -60,9 +63,66 @@ class PodItem extends vscode.TreeItem {
     }
 }
 
+class PodLogFollower implements vscode.TextDocumentContentProvider {
+    logs = new Map<string, string[]>();
+    streams = new Map<string, PassThrough>();
+
+    constructor(context: vscode.ExtensionContext) {
+        context.subscriptions.push(
+            vscode.workspace.onDidCloseTextDocument(doc => {
+                let uriString = doc.uri.toString();
+                console.log("CLOSE " + doc.uri + " " + uriString);
+                this.logs.delete(uriString);
+                let stream = this.streams.get(uriString);
+                if (stream)
+                {
+                    console.log("POD LOG STREAM DESTROY");
+                    stream.destroy();
+                }
+                this.streams.delete(uriString);
+            })
+        );
+    }
+
+    onDidChangeEmitter = new vscode.EventEmitter<vscode.Uri>();
+    onDidChange = this.onDidChangeEmitter.event;
+
+    async provideTextDocumentContent(uri: vscode.Uri, token: vscode.CancellationToken): Promise<string> {
+        let uriString = uri.toString();
+        if (!this.logs.has(uriString)) {
+            console.log("POD LOG CREATE " + uri.path + " " + uriString);
+            let stream = await getLogStream(uri.path);
+            this.logs.set(uriString, []);
+            let fireRefresh = throttled(() => this.onDidChangeEmitter.fire(uri), 50);
+            stream.on('data', (chunk: string) => {
+                this.logs.get(uriString)!.push(chunk);
+                fireRefresh();
+            });
+            this.streams.set(uriString, stream);
+        }
+        return this.logs.get(uriString)!.join('');
+    }
+}
+
 class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
     private _onDidChangeTreeData: vscode.EventEmitter<PodItem | undefined | void> = new vscode.EventEmitter<PodItem | undefined | void>();
 	readonly onDidChangeTreeData: vscode.Event<PodItem | undefined | void> = this._onDidChangeTreeData.event;
+
+    constructor(context: vscode.ExtensionContext) {
+        context.subscriptions.push(
+            vscode.commands.registerCommand("naughty-k8s.res.refresh", () => {
+                this.refresh()
+            }),
+            vscode.commands.registerCommand("naughty-k8s.pod.log", async (podItem: PodItem) => {
+                await vscode.window.showTextDocument(vscode.Uri.parse(`naughtyk8slog:${podItem.name}`));
+            }),
+            vscode.commands.registerCommand("naughty-k8s.pod.test", async (podItem: PodItem) => {
+                let stream = await new BackedPodCommandStream(podItem.name).open();
+                console.log(await stream.run({ cmd: "ls", p: "/" }));
+                await stream.close();
+            })
+        );
+    }
 	
     filters = {
         name: ""
@@ -96,17 +156,14 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
 
 export default class KubernetesView {
     constructor(context: vscode.ExtensionContext) {
-        let provider = new KubernetesTreeProvider();
+        let provider = new KubernetesTreeProvider(context);
         let cfgProvider = new KubernetesConfigProvider(provider, context.extensionUri);
+        let logProvider = new PodLogFollower(context);
+        
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider('naughty-k8s.cfg', cfgProvider),
             vscode.window.registerTreeDataProvider('naughty-k8s.res', provider),
-            vscode.commands.registerCommand("naughty-k8s.res.refresh", () => provider.refresh()),
-            vscode.commands.registerCommand("naughty-k8s.pod.test", async (podItem: PodItem) => {
-                let stream = await new BackedPodCommandStream(podItem.name).open();
-                console.log(await stream.run({ cmd: "ls", p: "/" }));
-                await stream.close();
-            })
+            vscode.workspace.registerTextDocumentContentProvider('naughtyk8slog', logProvider),
         );
     }
 }

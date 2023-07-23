@@ -26,6 +26,11 @@
       {
         "command": "naughty-k8s.pod.test",
         "title": "Test Pod"
+      },
+      {
+        "command": "naughty-k8s.pod.log",
+        "title": "Open Streamed Pod Log",
+        "icon": "$(output-view-icon)"
       }
     ],
     "menus": {
@@ -40,6 +45,11 @@
         {
           "command": "naughty-k8s.pod.test",
           "when": "view == naughty-k8s.res && viewItem == running"
+        },
+        {
+          "command": "naughty-k8s.pod.log",
+          "when": "view == naughty-k8s.res",
+          "group": "inline"
         }
       ]
     },
