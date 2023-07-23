@@ -10,6 +10,17 @@ import * as view from './view';
 export async function activate(context: vscode.ExtensionContext) {
 	await installs.detectTools();
 	await api.startProxy(context);
+
+	context.subscriptions.push(vscode.commands.registerCommand('naughty-k8s.proxy.restart', async () => {
+		vscode.window.withProgress({
+			location: vscode.ProgressLocation.Notification,
+			title: "Refreshing k8s backend daemon",
+			cancellable: false
+		}, (progress, token) => {
+			return api.startProxy(context);
+		});
+	}));
+
 	new view.KubernetesView(context);
 }
 

@@ -37,17 +37,26 @@ export async function startProxy(context: vscode.ExtensionContext): Promise<Conf
     }
     let port = await new Promise<number>(resolve => {
         let spawn = exec("kubectl proxy -p 0 --keepalive 3600s");
+        let sub = {
+            dispose: () => {
+                if (spawn.exitCode === null)
+                    spawn.kill('SIGINT');
+            }
+        };
         spawn.stdout?.on('data', (data: string) => {
             resolve(parseInt(data.split(":").pop()!));
         })
-        context.subscriptions.push({
-            dispose: () => {
-                spawn.kill('SIGINT');
+        spawn.stderr?.on('data', (data: string) => {
+            if (data.toLowerCase().includes('error')) {
+                sub.dispose();
+                vscode.commands.executeCommand('naughty-k8s.proxy.restart');
             }
-        })
+        });
+        context.subscriptions.push(sub);
     });
     activeProxy.namespace = namespace;
     activeProxy.port = port;
+    console.log(`kubectl backend daemon on port ${port}`);
     client.defaults.baseURL = `http://127.0.0.1:${port}/`;
     return { port, namespace };
 }

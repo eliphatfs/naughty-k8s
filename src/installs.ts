@@ -30,6 +30,6 @@ async function kubeconvert() {
 }
 
 export async function detectTools() {
-    await kubectl();
-    await kubeconvert();
+    for (let promise of [kubectl(), kubeconvert()])
+        await promise;
 }

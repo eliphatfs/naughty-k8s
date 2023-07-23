@@ -17,6 +17,11 @@
         "command": "naughty-k8s.res.refresh",
         "title": "Refresh Kubernetes Resources",
         "icon": "$(extensions-refresh)"
+      },
+      {
+        "command": "naughty-k8s.proxy.restart",
+        "title": "Restart Kubernetes Backend",
+        "icon": "$(debug-restart)"
       }
     ],
     "menus": {
