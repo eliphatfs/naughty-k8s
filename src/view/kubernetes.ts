@@ -21,7 +21,6 @@ class KubernetesConfigProvider implements vscode.WebviewViewProvider {
         };
         webviewView.webview.html = html(webviewView.webview, this.extensionUri, "naughty-k8s.cfg.js");
         webviewView.webview.onDidReceiveMessage((ev) => {
-            console.log(ev);
             if (ev.command == 'filter-name')
             {
                 if (this.tree.filters.name != ev.args[0])
@@ -35,8 +34,25 @@ class KubernetesConfigProvider implements vscode.WebviewViewProvider {
 }
 
 class PodItem extends vscode.TreeItem {
-    constructor(label: string, collapsibleState: vscode.TreeItemCollapsibleState) {
-        super(label, collapsibleState);
+    constructor(name: string, status: string, collapsibleState: vscode.TreeItemCollapsibleState) {
+        super(`${name} (${status})`, collapsibleState);
+        switch (status.toLowerCase()) {
+            case "running":
+                this.iconPath = new vscode.ThemeIcon("gear~spin", new vscode.ThemeColor("testing.runAction"));
+                break;
+            case "pending":
+                this.iconPath = new vscode.ThemeIcon("clock");
+                break;
+            case "succeeded":
+                this.iconPath = new vscode.ThemeIcon("check");
+                break;
+            case "failed":
+                this.iconPath = new vscode.ThemeIcon("warning", new vscode.ThemeColor("errorForeground"));
+                break;
+            case "unknown":
+                this.iconPath = new vscode.ThemeIcon("question");
+                break;
+        }
     }
 }
 
@@ -67,7 +83,7 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
                 const status = pod.status?.phase ?? "<unknown>";
                 if (!name.includes(this.filters.name))
                     continue;
-                pods.push(new PodItem(`${name} (${status})`, vscode.TreeItemCollapsibleState.None));
+                pods.push(new PodItem(name, status, vscode.TreeItemCollapsibleState.None));
             }
             return pods;
         }
