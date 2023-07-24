@@ -25,7 +25,7 @@ export default class PodFS implements vscode.FileSystemProvider {
 
     constructor(context: vscode.ExtensionContext) {
         context.subscriptions.push(
-            vscode.workspace.registerFileSystemProvider('nk8spodfs', this, { isCaseSensitive: true, isReadonly: true }),
+            vscode.workspace.registerFileSystemProvider('nk8spodfs', this, { isCaseSensitive: true }),
             vscode.commands.registerCommand('naughty-k8s.podfs.mount', (pod: string) => {
                 vscode.workspace.updateWorkspaceFolders(
                     vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0,
@@ -52,7 +52,11 @@ export default class PodFS implements vscode.FileSystemProvider {
                 await future;
             });
         }
+        console.log(command);
+        let t = Date.now();
         let resp = await cmds.run<TR, TC>(command);
+        console.log(resp);
+        console.log(resp.ticket + ": " + (Date.now() - t)  + "ms response time");
         return resp;
     }
 
@@ -70,8 +74,8 @@ export default class PodFS implements vscode.FileSystemProvider {
         return results.files.map((x) => [x.name, x.kind]);
     }
     
-    createDirectory(uri: vscode.Uri): void | Thenable<void> {
-        throw new Error('Method not implemented.');
+    async createDirectory(uri: vscode.Uri) {
+        await this.podRun(uri.authority, { cmd: 'mkdirs', p: uri.path });
     }
 
     async readFile(uri: vscode.Uri): Promise<Uint8Array> {
@@ -81,17 +85,27 @@ export default class PodFS implements vscode.FileSystemProvider {
         );
     }
 
-    writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; }): void | Thenable<void> {
-        throw new Error('Method not implemented.');
+    async writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; }) {
+        // TODO: implement create and overwrite
+        await this.podRun(uri.authority, { cmd: 'b64write', p: uri.path, contents: Buffer.from(content).toString('base64') });
     }
-    delete(uri: vscode.Uri, options: { readonly recursive: boolean; }): void | Thenable<void> {
-        throw new Error('Method not implemented.');
+
+    async delete(uri: vscode.Uri, options: { readonly recursive: boolean; }) {
+        await this.podRun(uri.authority, { cmd: 'rm', p: uri.path, recursive: options.recursive });
     }
-    rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; }): void | Thenable<void> {
-        throw new Error('Method not implemented.');
+
+    async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; }) {
+        // TODO: implement overwrite
+        if (oldUri.authority != newUri.authority)
+            throw new Error("Moving across pods is not supported yet.")
+        await this.podRun(oldUri.authority, { cmd: 'mv', src: oldUri.path, dst: newUri.path });
     }
-    copy?(source: vscode.Uri, destination: vscode.Uri, options: { readonly overwrite: boolean; }): void | Thenable<void> {
-        throw new Error('Method not implemented.');
+
+    async copy(source: vscode.Uri, destination: vscode.Uri, options: { readonly overwrite: boolean; }) {
+        // TODO: implement overwrite
+        if (source.authority != source.authority)
+            throw new Error("Copying across pods is not supported yet.")
+        await this.podRun(source.authority, { cmd: 'cp', src: source.path, dst: destination.path });
     }
 
 }

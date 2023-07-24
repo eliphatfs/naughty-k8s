@@ -1,10 +1,15 @@
 import os
 import stat
 import json
+import queue
+import shutil
 import base64
+import threading
 
 
 dispatcher = {}
+workspace_size_limit = 5 * 1024 * 1024
+stdout_lock = threading.Lock()
 
 
 def command(func):
@@ -27,17 +32,53 @@ def mstat(p):
         type=stat.S_ISREG(m) * 1 + stat.S_ISDIR(m) * 2 + stat.S_ISLNK(m) * 64,
         ctime=s.st_ctime_ns / 1e6,
         mtime=s.st_mtime_ns / 1e6,
-        size=s.st_size
+        size=s.st_size,
+        permissions=0 if os.access(p, os.W_OK) and s.st_size <= workspace_size_limit else 1
     )
 
 @command
 def b64read(p):
-    if os.path.getsize(p) > 5 * 1024 * 1024:
+    if os.path.getsize(p) > workspace_size_limit:
         return dict(b64=base64.standard_b64encode(
             b'We do not support files larger than 5MB in workspace yet since this would freeze the daemon'
         ).decode('ascii'))
     with open(p, 'rb') as f:
         return dict(b64=base64.standard_b64encode(f.read()).decode('ascii'))
+
+@command
+def b64write(p, contents):
+    # type: (str, str) -> dict
+    with open(p, 'wb') as f:
+        return dict(nb=f.write(base64.standard_b64decode(contents.encode('ascii'))))
+
+@command
+def mkdirs(p):
+    os.makedirs(p, exist_ok=True)
+    return dict()
+
+@command
+def rm(p, recursive=False):
+    if os.path.isdir(p):
+        if recursive:
+            shutil.rmtree(p)
+        else:
+            os.rmdir(p)
+    else:
+        os.remove(p)
+    return dict()
+
+@command
+def mv(src, dst):
+    shutil.move(src, dst)
+    return dict()
+
+@command
+def cp(src, dst):
+    if os.path.isdir(src):
+        shutil.copytree(src, dst, dirs_exist_ok=True, symlinks=True)
+    else:
+        shutil.copy(src, dst)
+    return dict()
 
 @command
 def cd(p):
@@ -48,20 +89,34 @@ def cd(p):
 def test():
     return dict(msg="hello from pod")
 
-def main(dispatcher=dispatcher):
+
+def dispatch(ticket, line):
+    # type: (int, dict) -> None
+    try:
+        cmd = line.pop('cmd')
+        r = dispatcher[cmd](**line)  # type: dict
+        r.update(result='I', ticket=ticket)
+        with stdout_lock:
+            print(json.dumps(r), flush=True)
+    except Exception as exc:
+        with stdout_lock:
+            print(json.dumps({"result": "E", "ticket": ticket, "msg": str(exc)}), flush=True)
+
+
+def main():
     while True:
         try:
-            ticket = None
             line = json.loads(input())  # type: dict
             ticket = line.pop('ticket')
-            cmd = line.pop('cmd')
-            r = dispatcher[cmd](**line)  # type: dict
-            r.update(result='I', ticket=ticket)
-            print(json.dumps(r), flush=True)
+            threading.Thread(
+                target=dispatch, args=(ticket, line),
+                daemon=True, name="dispatch-%d" % ticket
+            ).start()
         except EOFError:
             return
         except Exception as exc:
-            print(json.dumps({"result": "E", "ticket": ticket, "msg": str(exc)}), flush=True)
+            with stdout_lock:
+                print(json.dumps({"result": "E", "msg": str(exc)}), flush=True)
 
 
 if __name__ == '__main__':
