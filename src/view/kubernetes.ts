@@ -161,7 +161,7 @@ export default class KubernetesView {
         let logProvider = new PodLogFollower(context);
         
         context.subscriptions.push(
-            vscode.window.registerWebviewViewProvider('naughty-k8s.cfg', cfgProvider),
+            vscode.window.registerWebviewViewProvider('naughty-k8s.cfg', cfgProvider, { webviewOptions: { retainContextWhenHidden: true } }),
             vscode.window.registerTreeDataProvider('naughty-k8s.res', provider),
             vscode.workspace.registerTextDocumentContentProvider('naughtyk8slog', logProvider),
         );
