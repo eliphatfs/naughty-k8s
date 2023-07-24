@@ -116,9 +116,14 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
             vscode.commands.registerCommand("naughty-k8s.pod.log", async (podItem: PodItem) => {
                 await vscode.window.showTextDocument(vscode.Uri.parse(`nk8slog:${podItem.name}`));
             }),
+            vscode.commands.registerCommand("naughty-k8s.pod.mount", async (podItem: PodItem) => {
+                await vscode.commands.executeCommand("naughty-k8s.podfs.mount", podItem.name);
+            }),
             vscode.commands.registerCommand("naughty-k8s.pod.test", async (podItem: PodItem) => {
                 let stream = await new BackedPodCommandStream(podItem.name).open();
-                console.log(await stream.run({ cmd: "ls", p: "/" }));
+                vscode.window.showInformationMessage(
+                    "Test pod successful with message: " + (await stream.run({ cmd: "test" })).msg
+                );
                 await stream.close();
             })
         );

@@ -22,6 +22,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	}));
 
 	new view.KubernetesView(context);
+	new view.PodFS(context);
 }
 
 // This method is called when your extension is deactivated

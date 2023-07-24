@@ -14,6 +14,7 @@ export interface Command {
 
 export interface Result {
     result: string
+    ticket: number | undefined
     msg: string | undefined
 }
 
@@ -58,7 +59,7 @@ export class BackedPodCommandStream {
         let ssc = await fs.promises.readFile(path.join(__filename, '..', '..', 'serverside', 'host.py'), 'ascii');
         this.ws = await new k8s.Exec(api.kube()).exec(
             api.ns(), this.name, '',
-            ['python3', '-u', '-c', ssc],
+            ['python3', '-c', ssc],
             this.stdout, null, this.stdin, false,
             (status) => {
                 if (status.status == "Failure")
@@ -71,16 +72,36 @@ export class BackedPodCommandStream {
             this.open();
         });
         
+        this.stdoutReader.on('line', (line) => {
+            let result: Result = JSON.parse(line);
+            if (!result.ticket)
+                vscode.window.showWarningMessage("Pod daemon internal error: " + line);
+            else {
+                let resolver = this.resolvers.get(result.ticket);
+                if (resolver) {
+                    resolver(result);
+                    this.resolvers.delete(result.ticket);
+                }
+                else {
+                    vscode.window.showWarningMessage("Unexpected pod daemon return: " + line);
+                }
+            }
+        });
+
         return this;
     }
 
-    async run<TC extends Command, TR extends Result>(command: TC): Promise<TR> {
+    ticket = 0
+    resolvers = new Map<number, (x: any) => void>;
+
+    async run<TR extends Result, TC extends Command>(command: TC): Promise<TR> {
+        let ticket = ++this.ticket;
+        (command as any).ticket = ticket;
         this.stdin.write(JSON.stringify(command) + "\n");
-        let resp = await new Promise<TR>((resolve) => this.stdoutReader.once('line', (res) => {
-            resolve(JSON.parse(res));
-        }));
-        if (resp.result === "E")
-            vscode.window.showWarningMessage("Remote command failed with error: " + resp.msg);
+        let resp = await new Promise<TR>(resolve => this.resolvers.set(ticket, resolve));
+        if (resp.result === "E") {
+            throw new Error("Remote command failed with error: " + resp.msg);
+        }
         return resp;
     }
 

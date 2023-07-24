@@ -9,7 +9,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onFileSystem:nk8spodfs"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -22,6 +24,14 @@
         "command": "naughty-k8s.proxy.restart",
         "title": "Restart Kubernetes Backend",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "naughty-k8s.pod.mount",
+        "title": "Mount Pod FS"
+      },
+      {
+        "command": "naughty-k8s.podfs.mount",
+        "title": "Mount Pod FS (Low Level)"
       },
       {
         "command": "naughty-k8s.pod.test",
@@ -42,6 +52,10 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "naughty-k8s.pod.mount",
+          "when": "view == naughty-k8s.res && viewItem == running"
+        },
         {
           "command": "naughty-k8s.pod.test",
           "when": "view == naughty-k8s.res && viewItem == running"

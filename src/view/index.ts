@@ -1,3 +1,4 @@
 import KubernetesView from './kubernetes';
+import PodFS from './podfs';
 
-export { KubernetesView };
+export { KubernetesView, PodFS };
