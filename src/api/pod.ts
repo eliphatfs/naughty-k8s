@@ -65,8 +65,8 @@ export class BackedPodCommandStream {
                     vscode.window.showWarningMessage("Pod daemon failed to start (probably missing python3 installation): " + status.message);
             }
         );
-        this.ws.on('error', async () => {
-            vscode.window.showInformationMessage("Lost connection to pod, reconnecting...");
+        this.ws.on('error', async (err) => {
+            vscode.window.showInformationMessage("Reconnecting due to lost connection to pod: " + err.message);
             await delay(3000);
             this.open();
         });
