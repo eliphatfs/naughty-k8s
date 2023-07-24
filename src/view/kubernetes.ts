@@ -71,12 +71,12 @@ class PodLogFollower implements vscode.TextDocumentContentProvider {
         context.subscriptions.push(
             vscode.workspace.onDidCloseTextDocument(doc => {
                 let uriString = doc.uri.toString();
-                console.log("CLOSE " + doc.uri + " " + uriString);
+                console.log("CLOSE " + uriString);
                 this.logs.delete(uriString);
                 let stream = this.streams.get(uriString);
                 if (stream)
                 {
-                    console.log("POD LOG STREAM DESTROY");
+                    console.log("POD LOG STREAM DESTROY " + uriString);
                     stream.destroy();
                 }
                 this.streams.delete(uriString);
@@ -114,7 +114,7 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
                 this.refresh()
             }),
             vscode.commands.registerCommand("naughty-k8s.pod.log", async (podItem: PodItem) => {
-                await vscode.window.showTextDocument(vscode.Uri.parse(`naughtyk8slog:${podItem.name}`));
+                await vscode.window.showTextDocument(vscode.Uri.parse(`nk8slog:${podItem.name}`));
             }),
             vscode.commands.registerCommand("naughty-k8s.pod.test", async (podItem: PodItem) => {
                 let stream = await new BackedPodCommandStream(podItem.name).open();
@@ -163,7 +163,7 @@ export default class KubernetesView {
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider('naughty-k8s.cfg', cfgProvider, { webviewOptions: { retainContextWhenHidden: true } }),
             vscode.window.registerTreeDataProvider('naughty-k8s.res', provider),
-            vscode.workspace.registerTextDocumentContentProvider('naughtyk8slog', logProvider),
+            vscode.workspace.registerTextDocumentContentProvider('nk8slog', logProvider),
         );
     }
 }
