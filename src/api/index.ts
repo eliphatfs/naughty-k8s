@@ -1,11 +1,11 @@
-import { ChildProcess, exec } from "child_process";
+import * as child_process from "child_process";
 import * as vscode from "vscode";
 import * as k8s from '@kubernetes/client-node';
 
 interface Configuration {
     port: number,
     namespace: string,
-    spawn: ChildProcess | null,
+    spawn: child_process.ChildProcess | null,
     kc: k8s.KubeConfig,
 }
 
@@ -35,23 +35,27 @@ export function kube() { return activeProxy.kc; }
 
 export async function startProxy(context: vscode.ExtensionContext): Promise<number> {
     let port = await new Promise<number>(resolve => {
-        let spawn = exec("kubectl proxy -p 0 --keepalive 3600s --disable-filter=true");
+        let spawn = child_process.spawn("kubectl", "proxy -p 0 --keepalive 3600s --disable-filter=true".split(' '));
         let sub = {
             dispose: () => {
                 if (spawn.exitCode === null)
                     spawn.kill('SIGINT');
             }
         };
-        spawn.stdout?.on('data', (data: string) => {
-            resolve(parseInt(data.split(":").pop()!));
-        })
-        spawn.stderr?.on('data', (data: string) => {
-            if (data.toLowerCase().includes('error')) {
-                sub.dispose();
-                vscode.commands.executeCommand('naughty-k8s.proxy.restart');
-            }
-        });
+        process.on('exit', () => sub.dispose());
+        if (activeProxy.spawn?.exitCode === null)
+            activeProxy.spawn?.kill('SIGTERM');
+        activeProxy.spawn = spawn;
         context.subscriptions.push(sub);
+        spawn.stdout?.on('data', (data: Buffer) => {
+            resolve(parseInt(data.toString().split(":").pop()!));
+        })
+        spawn.stderr?.on('data', (data: Buffer) => {
+            let message = data.toString();
+            if (message.trim().startsWith("W"))
+                return;
+            vscode.window.showWarningMessage("naughty-k8s daemon received error, you may want to restart daemon: " + message)
+        });
     });
     activeProxy.port = port;
     kc.loadFromClusterAndUser({
