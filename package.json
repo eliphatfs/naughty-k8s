@@ -27,11 +27,16 @@
       },
       {
         "command": "naughty-k8s.pod.mount",
-        "title": "Mount Pod FS"
+        "title": "Mount PodFS"
       },
       {
         "command": "naughty-k8s.podfs.mount",
-        "title": "Mount Pod FS (Low Level)"
+        "title": "Mount PodFS (Low Level)"
+      },
+      {
+        "command": "naughty-k8s.podfs.entry.refresh",
+        "title": "PodFS: Refresh Entry",
+        "icon": "$(extensions-refresh)"
       },
       {
         "command": "naughty-k8s.pod.test",
