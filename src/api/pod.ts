@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as api from '.';
 import * as k8s from '@kubernetes/client-node';
 import path from 'path';
-import fs, { stat } from 'fs';
+import fs from 'fs';
 import stream from 'stream';
 import WebSocket from 'ws';
 import { delay } from '../utils';
@@ -49,8 +49,9 @@ export class BackedPodCommandStream {
 
     constructor(name: string) {
         this.name = name
-        this.stdin = new stream.PassThrough();
-        this.stdout = new stream.PassThrough();
+        // a single huge page
+        this.stdin = new stream.PassThrough({ highWaterMark: 2 * 1024 * 1024 });
+        this.stdout = new stream.PassThrough({ highWaterMark: 2 * 1024 * 1024 });
         // this.stderr = new stream.PassThrough();
         this.stdoutReader = createInterface(this.stdout);
     }
@@ -63,7 +64,7 @@ export class BackedPodCommandStream {
             this.stdout, null, this.stdin, false,
             (status) => {
                 if (status.status == "Failure")
-                    vscode.window.showWarningMessage("Pod daemon failed to start (probably missing python3 installation): " + status.message);
+                    vscode.window.showWarningMessage("Pod daemon failed to start (probably pod stopped or missing python3 installation): " + status.message);
             }
         );
         this.ws.on('error', async (err) => {
