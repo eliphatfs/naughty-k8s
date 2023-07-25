@@ -38,6 +38,10 @@
         "title": "Mount PodFS (Low Level)"
       },
       {
+        "command": "naughty-k8s.podfs.entry.download",
+        "title": "PodFS: Download"
+      },
+      {
         "command": "naughty-k8s.podfs.entry.refresh",
         "title": "PodFS: Refresh Entry",
         "icon": "$(extensions-refresh)"
@@ -58,6 +62,12 @@
       }
     ],
     "menus": {
+      "explorer/context": [
+        {
+          "command": "naughty-k8s.podfs.entry.download",
+          "when": "resourceScheme == nk8spodfs"
+        }
+      ],
       "view/title": [
         {
           "command": "naughty-k8s.res.refresh",
@@ -126,6 +136,7 @@
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "20.2.5",
+    "@types/tar": "^6.1.5",
     "@types/vscode": "^1.76.0",
     "@typescript-eslint/eslint-plugin": "^5.59.8",
     "@typescript-eslint/parser": "^5.59.8",

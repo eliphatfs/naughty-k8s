@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { BackedPodCommandStream, Command, Result } from '../api/pod';
+import { BackedPodCommandStream, Command, Result, downloadFile } from '../api/pod';
 
 interface PathCommand<T extends string> extends Command {
     cmd: T, p: string
@@ -39,6 +39,9 @@ export default class PodFS implements vscode.FileSystemProvider {
             }),
             vscode.commands.registerCommand('naughty-k8s.podfs.entry.refresh', (item: vscode.Uri) => {
                 this._onDidChangeFile.fire([{ uri: item, type: vscode.FileChangeType.Changed }])
+            }),
+            vscode.commands.registerCommand('naughty-k8s.podfs.entry.download', async (item: vscode.Uri) => {
+                await downloadFile(item.authority, item.path);
             }),
             this
         );

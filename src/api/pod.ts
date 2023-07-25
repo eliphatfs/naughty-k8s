@@ -7,6 +7,7 @@ import stream from 'stream';
 import WebSocket from 'ws';
 import { delay } from '../utils';
 import { Interface, createInterface } from 'readline';
+import * as tar from 'tar';
 
 export interface Command {
     cmd: string
@@ -64,6 +65,30 @@ export async function describeStream(podName: string) {
 }
 
 
+export async function downloadFile(podName: string, fp: string) {
+    console.log("IN DOWNLOAD FILE")
+    let localRoot = vscode.workspace.workspaceFolders?.find(x => x.uri.scheme == 'file');
+    if (!localRoot) {
+        vscode.window.showErrorMessage("Cannot download: No local root workspace folder found!");
+        throw new Error("Cannot download: No local root workspace folder found!")
+    }
+    let t = Date.now();
+    let basep = path.basename(fp);
+    let dirp = path.dirname(fp);
+    let stdout = tar.extract({ C: localRoot.uri.fsPath });
+    let ws = await new k8s.Exec(api.kube()).exec(api.ns(), podName, '', ['tar', 'zcf', '-', '-C', dirp, basep], stdout, null, null, false, (status) => {
+        if (status.status == "Failure")
+            vscode.window.showWarningMessage("Pod daemon failed to start (probably pod stopped or missing tar installation): " + status.message);
+    });
+    await new Promise(resolve => ws.on('close', resolve));
+    let td = Date.now();
+    let target = vscode.Uri.joinPath(localRoot.uri, path.basename(fp));
+    let sz = (await vscode.workspace.fs.stat(target)).size;
+    console.log(sz / 1e6 + " MB in " + (td - t) / 1e3 + " seconds");
+    console.log("Thoughput: " + (sz / (td - t)) + " KiB/s");
+}
+
+
 export class BackedPodCommandStream {
     name: string
     stdin: stream.PassThrough
@@ -98,6 +123,7 @@ export class BackedPodCommandStream {
             this.open();
         });
         
+        this.stdoutReader.removeAllListeners();
         this.stdoutReader.on('line', (line) => {
             let result: Result = JSON.parse(line);
             if (!result.ticket)
