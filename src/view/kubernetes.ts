@@ -5,13 +5,24 @@ import { PassThrough } from 'stream';
 import { throttled } from '../utils';
 
 
+function getNameFilterValue(context: vscode.ExtensionContext) {
+    return context.globalState.get<string>('nk8s.cfg.name-filter-value') ?? "";
+}
+
+function setNameFilterValue(context: vscode.ExtensionContext, val: string) {
+    return context.globalState.update('nk8s.cfg.name-filter-value', val);
+}
+
+
 class KubernetesConfigProvider implements vscode.WebviewViewProvider {
     tree: KubernetesTreeProvider
     extensionUri: vscode.Uri
+    context: vscode.ExtensionContext
 
-    constructor(controlledTree: KubernetesTreeProvider, extensionUri: vscode.Uri) {
+    constructor(controlledTree: KubernetesTreeProvider, context: vscode.ExtensionContext) {
         this.tree = controlledTree;
-        this.extensionUri = extensionUri
+        this.extensionUri = context.extensionUri;
+        this.context = context;
     }
 
     resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext<unknown>, token: vscode.CancellationToken) {
@@ -24,13 +35,15 @@ class KubernetesConfigProvider implements vscode.WebviewViewProvider {
         };
         webviewView.webview.html = html(webviewView.webview, this.extensionUri, "naughty-k8s.cfg.js");
         webviewView.webview.onDidReceiveMessage((ev) => {
-            if (ev.command == 'filter-name')
-            {
-                if (this.tree.filters.name != ev.args[0])
-                {
-                    this.tree.filters.name = ev.args[0];
-                    this.tree.refresh();
+            if (ev.command == 'filter-name') {
+                if (getNameFilterValue(this.context) != ev.args[0]) {
+                    setNameFilterValue(this.context, ev.args[0]).then(() => this.tree.refresh());
                 }
+            }
+            if (ev.command == 'ready') {
+                webviewView.webview.postMessage({
+                    command: 'init', nameFilterValue: getNameFilterValue(this.context)
+                });
             }
         })
     }
@@ -108,7 +121,10 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
     private _onDidChangeTreeData: vscode.EventEmitter<PodItem | undefined | void> = new vscode.EventEmitter<PodItem | undefined | void>();
 	readonly onDidChangeTreeData: vscode.Event<PodItem | undefined | void> = this._onDidChangeTreeData.event;
 
+    context: vscode.ExtensionContext
+
     constructor(context: vscode.ExtensionContext) {
+        this.context = context;
         context.subscriptions.push(
             vscode.commands.registerCommand("naughty-k8s.res.refresh", () => {
                 this.refresh()
@@ -128,10 +144,6 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
             })
         );
     }
-	
-    filters = {
-        name: ""
-    };
 
     refresh(): void {
 		this._onDidChangeTreeData.fire();
@@ -146,11 +158,12 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
           return [];
         } else {
             let pods = [];
+            let nameFilter = getNameFilterValue(this.context);
             for (let pod of await listPods())
             {
                 const name = pod.metadata?.name ?? "<unnamed>";
                 const status = pod.status?.phase ?? "<unknown>";
-                if (!name.includes(this.filters.name))
+                if (!name.includes(nameFilter))
                     continue;
                 pods.push(new PodItem(name, status, vscode.TreeItemCollapsibleState.None));
             }
@@ -162,11 +175,11 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
 export default class KubernetesView {
     constructor(context: vscode.ExtensionContext) {
         let provider = new KubernetesTreeProvider(context);
-        let cfgProvider = new KubernetesConfigProvider(provider, context.extensionUri);
+        let cfgProvider = new KubernetesConfigProvider(provider, context);
         let logProvider = new PodLogFollower(context);
         
         context.subscriptions.push(
-            vscode.window.registerWebviewViewProvider('naughty-k8s.cfg', cfgProvider, { webviewOptions: { retainContextWhenHidden: true } }),
+            vscode.window.registerWebviewViewProvider('naughty-k8s.cfg', cfgProvider),
             vscode.window.registerTreeDataProvider('naughty-k8s.res', provider),
             vscode.workspace.registerTextDocumentContentProvider('nk8slog', logProvider),
         );
