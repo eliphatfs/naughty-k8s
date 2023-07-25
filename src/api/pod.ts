@@ -41,6 +41,7 @@ export async function getLogStream(podName: string) {
 
 export async function describeStream(podName: string) {
     const ps = new stream.PassThrough({ encoding: 'utf-8' });
+    let dontWorryItsMe = false;
     const watch = await new k8s.Watch(api.kube()).watch(
         '/api/v1/namespaces/ucsd-haosulab/events',
         { fieldSelector: `involvedObject.name==${podName}` },
@@ -49,10 +50,14 @@ export async function describeStream(podName: string) {
                 ps.write(apiObj.lastTimestamp + "\t" + apiObj.type + "\t" + apiObj.reason + "\t" + apiObj.message + '\n');
             }
         },
-        (err) => { vscode.window.showErrorMessage(`Error in describe streaming ${podName}: ${err.message}`); }
+        (err) => {
+            if (!dontWorryItsMe)
+                vscode.window.showErrorMessage(`Error in describe streaming ${podName}: ${err.message}`);
+        }
     );
     ps.on('close', () => {
         console.log("POD DESCRIBE STREAM CLOSED");
+        dontWorryItsMe = true;
         watch.abort();
     });
     return ps;
