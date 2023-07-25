@@ -25,7 +25,7 @@ def ls(p):
 
 @command
 def mstat(p):
-    s = os.lstat(p)
+    s = os.stat(p)
     m = s.st_mode
     prefetch_ls = None
     if stat.S_ISDIR(m):
