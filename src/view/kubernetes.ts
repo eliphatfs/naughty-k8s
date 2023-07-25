@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { listPods, BackedPodCommandStream, getLogStream } from '../api/pod';
+import { listPods, BackedPodCommandStream, getLogStream, describeStream } from '../api/pod';
 import { html } from './webviews';
 import { PassThrough } from 'stream';
 import { throttled } from '../utils';
@@ -117,6 +117,46 @@ class PodLogFollower implements vscode.TextDocumentContentProvider {
     }
 }
 
+class PodDescribeFollower implements vscode.TextDocumentContentProvider {
+    logs = new Map<string, string[]>();
+    streams = new Map<string, PassThrough>();
+
+    constructor(context: vscode.ExtensionContext) {
+        context.subscriptions.push(
+            vscode.workspace.onDidCloseTextDocument(doc => {
+                let uriString = doc.uri.toString();
+                this.logs.delete(uriString);
+                let stream = this.streams.get(uriString);
+                if (stream)
+                {
+                    console.log("POD DESCRIBE STREAM DESTROY " + uriString);
+                    stream.destroy();
+                }
+                this.streams.delete(uriString);
+            })
+        );
+    }
+
+    onDidChangeEmitter = new vscode.EventEmitter<vscode.Uri>();
+    onDidChange = this.onDidChangeEmitter.event;
+
+    async provideTextDocumentContent(uri: vscode.Uri, token: vscode.CancellationToken): Promise<string> {
+        let uriString = uri.toString();
+        if (!this.logs.has(uriString)) {
+            console.log("POD DESCRIBE CREATE " + uri.path + " " + uriString);
+            let stream = await describeStream(uri.path);
+            this.logs.set(uriString, []);
+            let fireRefresh = throttled(() => this.onDidChangeEmitter.fire(uri), 50);
+            stream.on('data', (chunk: string) => {
+                this.logs.get(uriString)!.push(chunk);
+                fireRefresh();
+            });
+            this.streams.set(uriString, stream);
+        }
+        return this.logs.get(uriString)!.join('');
+    }
+}
+
 class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
     private _onDidChangeTreeData: vscode.EventEmitter<PodItem | undefined | void> = new vscode.EventEmitter<PodItem | undefined | void>();
 	readonly onDidChangeTreeData: vscode.Event<PodItem | undefined | void> = this._onDidChangeTreeData.event;
@@ -131,6 +171,9 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
             }),
             vscode.commands.registerCommand("naughty-k8s.pod.log", async (podItem: PodItem) => {
                 await vscode.window.showTextDocument(vscode.Uri.parse(`nk8slog:${podItem.name}`));
+            }),
+            vscode.commands.registerCommand("naughty-k8s.pod.events", async (podItem: PodItem) => {
+                await vscode.window.showTextDocument(vscode.Uri.parse(`nk8sevt:${podItem.name}`));
             }),
             vscode.commands.registerCommand("naughty-k8s.pod.mount", async (podItem: PodItem) => {
                 await vscode.commands.executeCommand("naughty-k8s.podfs.mount", podItem.name);
@@ -180,11 +223,13 @@ export default class KubernetesView {
         let provider = new KubernetesTreeProvider(context);
         let cfgProvider = new KubernetesConfigProvider(provider, context);
         let logProvider = new PodLogFollower(context);
+        let eventProvider = new PodDescribeFollower(context);
         
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider('naughty-k8s.cfg', cfgProvider),
             vscode.window.registerTreeDataProvider('naughty-k8s.res', provider),
             vscode.workspace.registerTextDocumentContentProvider('nk8slog', logProvider),
+            vscode.workspace.registerTextDocumentContentProvider('nk8sevt', eventProvider),
         );
     }
 }
