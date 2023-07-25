@@ -30,6 +30,10 @@
         "title": "Mount PodFS"
       },
       {
+        "command": "naughty-k8s.pod.copyname",
+        "title": "Copy Name"
+      },
+      {
         "command": "naughty-k8s.podfs.mount",
         "title": "Mount PodFS (Low Level)"
       },
@@ -60,6 +64,10 @@
         {
           "command": "naughty-k8s.pod.mount",
           "when": "view == naughty-k8s.res && viewItem == running"
+        },
+        {
+          "command": "naughty-k8s.pod.copyname",
+          "when": "view == naughty-k8s.res"
         },
         {
           "command": "naughty-k8s.pod.test",
