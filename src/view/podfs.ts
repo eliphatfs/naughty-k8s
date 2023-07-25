@@ -5,8 +5,12 @@ interface PathCommand<T extends string> extends Command {
     cmd: T, p: string
 }
 
+interface LsEntry {
+    n: string, k: vscode.FileType
+}
+
 interface LsResult extends Result {
-    files: { name: string, kind: vscode.FileType }[]
+    files: LsEntry[]
 }
 
 interface B64ReadResult extends Result {
@@ -16,7 +20,7 @@ interface B64ReadResult extends Result {
 type LsCommand = PathCommand<"ls">;
 type MStatCommand = PathCommand<"mstat">;
 type B64ReadCommand = PathCommand<"b64read">;
-type MStatResult = Result & vscode.FileStat;
+type MStatResult = Result & vscode.FileStat & { prefetch_ls: LsEntry[] | null };
 
 
 export default class PodFS implements vscode.FileSystemProvider {
@@ -32,8 +36,13 @@ export default class PodFS implements vscode.FileSystemProvider {
                     null,
                     { uri: vscode.Uri.parse(`nk8spodfs://${pod}/`) }
                 );
-            })
+            }),
+            this
         );
+    }
+
+    dispose() {
+        this.commandStreams.forEach((x) => x.close());
     }
 
     commandStreams = new Map<string, BackedPodCommandStream>();
@@ -65,13 +74,28 @@ export default class PodFS implements vscode.FileSystemProvider {
         return new vscode.Disposable(() => {});
     }
 
+    prefetch_ls = new Map<string, LsEntry[]>();
+
     async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
-        return await this.podRun<MStatResult, MStatCommand>(uri.authority, { cmd: 'mstat', p: uri.path });
+        let stat = await this.podRun<MStatResult, MStatCommand>(uri.authority, { cmd: 'mstat', p: uri.path });
+        if (stat.prefetch_ls !== null) {
+            this.prefetch_ls.set(uri.toString(), stat.prefetch_ls);
+            setTimeout(() => {
+                if (this.prefetch_ls.get(uri.toString()) === stat.prefetch_ls)
+                    this.prefetch_ls.delete(uri.toString());
+            }, 600);
+        }
+        return stat;
     }
 
     async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
+        let prefetch = this.prefetch_ls.get(uri.toString());
+        if (prefetch) {
+            this.prefetch_ls.delete(uri.toString());
+            return prefetch.map(x => [x.n, x.k]);
+        }
         let results = await this.podRun<LsResult, LsCommand>(uri.authority, { cmd: 'ls', p: uri.path });
-        return results.files.map((x) => [x.name, x.kind]);
+        return results.files.map((x) => [x.n, x.k]);
     }
     
     async createDirectory(uri: vscode.Uri) {

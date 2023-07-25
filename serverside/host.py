@@ -1,7 +1,6 @@
 import os
 import stat
 import json
-import queue
 import shutil
 import base64
 import threading
@@ -20,7 +19,7 @@ def command(func):
 @command
 def ls(p):
     return dict(files=[
-        dict(name=f.name, kind=f.is_file() * 1 + f.is_dir() * 2 + f.is_symlink() * 64)
+        dict(n=f.name, k=f.is_file() * 1 + f.is_dir() * 2 + f.is_symlink() * 64)
         for f in os.scandir(p)
     ])
 
@@ -28,11 +27,18 @@ def ls(p):
 def mstat(p):
     s = os.lstat(p)
     m = s.st_mode
+    prefetch_ls = None
+    if stat.S_ISDIR(m):
+        # prefetch
+        the_dir = ls(p)['files']
+        if sum(len(f['n']) for f in the_dir) + len(the_dir) * 8 < 4096:
+            prefetch_ls = the_dir
     return dict(
         type=stat.S_ISREG(m) * 1 + stat.S_ISDIR(m) * 2 + stat.S_ISLNK(m) * 64,
-        ctime=s.st_ctime_ns / 1e6,
-        mtime=s.st_mtime_ns / 1e6,
+        ctime=s.st_ctime_ns // 1e6,
+        mtime=s.st_mtime_ns // 1e6,
         size=s.st_size,
+        prefetch_ls=prefetch_ls,
         permissions=0 if os.access(p, os.W_OK) and s.st_size <= workspace_size_limit else 1
     )
 
