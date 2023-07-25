@@ -64,11 +64,12 @@ export default class PodFS implements vscode.FileSystemProvider {
                 await future;
             });
         }
-        console.log(command);
+        let future = cmds.run<TR, TC>(command);
         let t = Date.now();
-        let resp = await cmds.run<TR, TC>(command);
+        console.log(command);
+        let resp = await future;
         console.log(resp);
-        console.log(resp.ticket + ": " + (Date.now() - t)  + "ms response time");
+        console.log(podName + " " + resp.ticket + ": " + (Date.now() - t)  + "ms response time");
         return resp;
     }
 
