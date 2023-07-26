@@ -97,28 +97,91 @@ export async function whoIsUsingA100() {
     vscode.window.showInformationMessage("Done.");
 }
 
+function formatTime(seconds: number) {
+    if (!isFinite(seconds))
+        return "--";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.round(seconds % 60);
+    return [
+      h,
+      m > 9 ? m : (h ? '0' + m : m || '0'),
+      s > 9 ? s : '0' + s
+    ].filter(Boolean).join(':');
+}
 
-export async function downloadFile(podName: string, fp: string) {
+
+export async function downloadFile(srcUri: vscode.Uri, podName: string, fp: string) {
     console.log("IN DOWNLOAD FILE")
-    let localRoot = vscode.workspace.workspaceFolders?.find(x => x.uri.scheme == 'file');
-    if (!localRoot) {
-        vscode.window.showErrorMessage("Cannot download: No local root workspace folder found!");
-        throw new Error("Cannot download: No local root workspace folder found!")
+    let downloadPath = vscode.workspace.getConfiguration().get<string>("naughtyK8s.podFS.downloadPath");
+    let destination: string;
+    if (downloadPath) {
+        if (path.isAbsolute(downloadPath))
+            destination = downloadPath;
+        else {
+            let localRoot = vscode.workspace.workspaceFolders?.find(x => x.uri.scheme == 'file');
+            if (!localRoot) {
+                vscode.window.showErrorMessage("Cannot download: No local root workspace folder found!");
+                throw new Error("Cannot download: No local root workspace folder found!")
+            }
+            destination = path.join(localRoot.uri.fsPath, downloadPath);
+        }
     }
+    else {
+        vscode.window.showErrorMessage("Cannot download: Download Path not Configured!");
+        throw new Error("Cannot download: Download Path not Configured!")
+    }
+    let fsize = (await vscode.workspace.fs.stat(srcUri)).size;
     let t = Date.now();
     let basep = path.basename(fp);
     let dirp = path.dirname(fp);
-    let stdout = tar.extract({ C: localRoot.uri.fsPath });
+    await vscode.workspace.fs.createDirectory(vscode.Uri.file(destination));
+    let stdout = tar.extract({ C: destination });
     let ws = await new k8s.Exec(api.kube()).exec(api.ns(), podName, '', ['tar', 'zcf', '-', '-C', dirp, basep], stdout, null, null, false, (status) => {
         if (status.status == "Failure")
             vscode.window.showWarningMessage("Pod daemon failed to start (probably pod stopped or missing tar installation): " + status.message);
     });
-    await new Promise(resolve => ws.on('close', resolve));
+    ws.on('error', (err) => { vscode.window.showWarningMessage("Error downloading `" + basep + "`: " + err.message) })
+    let target = vscode.Uri.joinPath(vscode.Uri.file(destination), path.basename(fp));
+    await vscode.window.withProgress(
+        { cancellable: true, title: "Downloading: " + basep, location: vscode.ProgressLocation.Notification },
+        async (progress, token) => {
+            let downBytes = 0;
+            let window: number[] = [];
+            let reportSection = setInterval(async () => {
+                (await vscode.workspace.fs.stat(target).then((fstat) => {
+                    let sz = fstat.size;
+                    let delta = sz - downBytes;
+                    window.push(delta / 500);
+                    downBytes = sz;
+                    if (window.length > 10)
+                        window.shift();
+                    let speed = window.reduce((x, y) => x + y, 0) / window.length;
+                    let eta = (fsize - downBytes) / (speed * 1000);
+                    progress.report({
+                        message: `Downloading: ${basep} ${speed.toFixed()} KB/s ETA ${formatTime(eta)}`,
+                        increment: delta / fsize * 100
+                    })
+                }, () => {}));
+            }, 500);
+            let isCancel = false;
+            token.onCancellationRequested(() => {
+                isCancel = true;
+                ws.close()
+            });
+            await new Promise<void>(resolve => ws.on('close', () => {
+                clearInterval(reportSection);
+                if (isCancel)
+                    vscode.window.showInformationMessage("Transfer " + basep + " cancelled.");
+                else
+                    vscode.window.showInformationMessage("Transfer " + basep + " finished.");
+                resolve();
+            }));
+        }
+    )
     let td = Date.now();
-    let target = vscode.Uri.joinPath(localRoot.uri, path.basename(fp));
     let sz = (await vscode.workspace.fs.stat(target)).size;
-    console.log(sz / 1e6 + " MB in " + (td - t) / 1e3 + " seconds");
-    console.log("Thoughput: " + (sz / (td - t)) + " KiB/s");
+    vscode.window.showInformationMessage((sz / 1e6).toFixed(3) + " MB in " + ((td - t) / 1e3).toFixed(1) + " secs (" + (sz / (td - t)).toFixed(1) + " KB/s)");
 }
 
 

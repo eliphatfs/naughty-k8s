@@ -46,7 +46,8 @@ def mstat(p):
 def b64read(p):
     if os.path.getsize(p) > workspace_size_limit:
         return dict(b64=base64.standard_b64encode(
-            b'We do not support files larger than 5MB in workspace yet since this would freeze the daemon'
+            f'We do not support files larger than 5MB ({round(os.path.getsize(p) / 1048576)} MB) in workspace yet since this would freeze the daemon'
+            .encode()
         ).decode('ascii'))
     with open(p, 'rb') as f:
         return dict(b64=base64.standard_b64encode(f.read()).decode('ascii'))

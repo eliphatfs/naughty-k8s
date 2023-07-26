@@ -51,6 +51,10 @@
         "title": "Mount PodFS (Low Level)"
       },
       {
+        "command": "naughty-k8s.podfs.setDownloadPath",
+        "title": "PodFS: Set Download Destination"
+      },
+      {
         "command": "naughty-k8s.podfs.entry.download",
         "title": "PodFS: Download"
       },
@@ -83,6 +87,10 @@
         {
           "command": "naughty-k8s.podfs.entry.download",
           "when": "resourceScheme == nk8spodfs"
+        },
+        {
+          "command": "naughty-k8s.podfs.setDownloadPath",
+          "when": "resourceScheme == file"
         }
       ],
       "view/title": [

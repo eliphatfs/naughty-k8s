@@ -37,11 +37,14 @@ export default class PodFS implements vscode.FileSystemProvider {
                     { uri: vscode.Uri.parse(`nk8spodfs://${pod}/`) }
                 );
             }),
+            vscode.commands.registerCommand('naughty-k8s.podfs.setDownloadPath', async (item: vscode.Uri) => {
+                vscode.workspace.getConfiguration().update("naughtyK8s.podFS.downloadPath", item.fsPath);
+            }),
             vscode.commands.registerCommand('naughty-k8s.podfs.entry.refresh', (item: vscode.Uri) => {
                 this._onDidChangeFile.fire([{ uri: item, type: vscode.FileChangeType.Changed }])
             }),
             vscode.commands.registerCommand('naughty-k8s.podfs.entry.download', async (item: vscode.Uri) => {
-                await downloadFile(item.authority, item.path);
+                await downloadFile(item, item.authority, item.path);
             }),
             this
         );
