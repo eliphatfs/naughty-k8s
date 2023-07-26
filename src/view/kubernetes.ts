@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { listPods, BackedPodCommandStream, getLogStream, describeStream } from '../api/pod';
+import { listPods, BackedPodCommandStream, getLogStream, describeStream, whoIsUsingA100 } from '../api/pod';
 import { html } from './webviews';
 import { PassThrough } from 'stream';
 import { throttled } from '../utils';
@@ -187,6 +187,9 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
                     "Test pod successful with message: " + (await stream.run({ cmd: "test" })).msg
                 );
                 await stream.close();
+            }),
+            vscode.commands.registerCommand("naughty-k8s.pod.whoIsUsingA100", async () => {
+                await whoIsUsingA100();
             })
         );
     }

@@ -14,6 +14,19 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": [
+      {
+        "title": "Naughty K8s",
+        "id": "nk8scfg",
+        "properties": {
+          "naughtyK8s.podFS.downloadPath": {
+            "type": "string",
+            "description": "Download Path (Absolute or Relative to Workspace Directory)",
+            "default": ".nk8s"
+          }
+        }
+      }
+    ],
     "commands": [
       {
         "command": "naughty-k8s.res.refresh",
@@ -59,6 +72,10 @@
         "command": "naughty-k8s.pod.events",
         "title": "Open Streamed Pod Events",
         "icon": "$(symbol-event)"
+      },
+      {
+        "command": "naughty-k8s.pod.whoIsUsingA100",
+        "title": "Who Is Using A100?"
       }
     ],
     "menus": {

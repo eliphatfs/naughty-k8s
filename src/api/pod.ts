@@ -65,6 +65,39 @@ export async function describeStream(podName: string) {
 }
 
 
+export async function whoIsUsingA100() {
+    function key(a: k8s.V1Node) {
+        let labels = (a.metadata?.labels ?? {});
+        return parseInt(labels["nvidia.com/gpu.memory"] ?? "0") + parseInt(labels['nvidia.com/gpu.count'] ?? "0");
+    }
+    let nodes = (await api.make(k8s.CoreV1Api).listNode()).body.items.sort((a, b) => key(b) - key(a));
+    let usingPods = new Map<string, k8s.V1Pod[]>();
+    for (let node of nodes)
+        usingPods.set(node.metadata?.name ?? "", []);
+    for (let pod of (await api.make(k8s.CoreV1Api).listPodForAllNamespaces()).body.items)
+        if (pod.status?.phase == "Running" && pod.spec?.nodeName)
+            usingPods.get(pod.spec?.nodeName)?.push(pod);
+    let doc = [];
+    function gpu(a: k8s.V1Pod) {
+        return a.spec?.containers?.reduce((x, v) => x + (parseInt((v.resources?.requests ?? {})['nvidia.com/gpu'] ?? "0")), 0) ?? 0;
+    }
+    for (let node of nodes) {
+        let labels = (node.metadata?.labels ?? {});
+        if (!(parseInt(labels['nvidia.com/gpu.count']) ?? 0))
+            continue;
+        doc.push(node.metadata?.name + "\t" + labels['nvidia.com/gpu.product'] + " x " + labels['nvidia.com/gpu.count']);
+        for (let pod of usingPods.get(node.metadata?.name ?? "")!.sort((a, b) => gpu(b) - gpu(a))) {
+            if (0 == gpu(pod))
+                continue;
+            doc.push(gpu(pod) + "\t" + pod.metadata?.namespace + "::" + pod.metadata?.name);
+        }
+        doc.push("");
+    }
+    vscode.env.clipboard.writeText(doc.join('\n'));
+    vscode.window.showInformationMessage("Done.");
+}
+
+
 export async function downloadFile(podName: string, fp: string) {
     console.log("IN DOWNLOAD FILE")
     let localRoot = vscode.workspace.workspaceFolders?.find(x => x.uri.scheme == 'file');
