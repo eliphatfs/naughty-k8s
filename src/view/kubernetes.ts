@@ -189,7 +189,12 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
                 await stream.close();
             }),
             vscode.commands.registerCommand("naughty-k8s.pod.whoIsUsingA100", async () => {
-                await whoIsUsingA100();
+                vscode.window.withProgress(
+                    { cancellable: false, title: "Running GPU usage analysis", location: vscode.ProgressLocation.Notification },
+                    async (progress, token) => {
+                        await whoIsUsingA100();
+                    }
+                )
             })
         );
     }

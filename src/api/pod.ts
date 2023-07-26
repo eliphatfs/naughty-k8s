@@ -77,7 +77,7 @@ export async function whoIsUsingA100() {
     for (let pod of (await api.make(k8s.CoreV1Api).listPodForAllNamespaces()).body.items)
         if (pod.status?.phase == "Running" && pod.spec?.nodeName)
             usingPods.get(pod.spec?.nodeName)?.push(pod);
-    let doc = [];
+    let doc: string[] = [];
     function gpu(a: k8s.V1Pod) {
         return a.spec?.containers?.reduce((x, v) => x + (parseInt((v.resources?.requests ?? {})['nvidia.com/gpu'] ?? "0")), 0) ?? 0;
     }
@@ -85,7 +85,8 @@ export async function whoIsUsingA100() {
         let labels = (node.metadata?.labels ?? {});
         if (!(parseInt(labels['nvidia.com/gpu.count']) ?? 0))
             continue;
-        doc.push(node.metadata?.name + "\t" + labels['nvidia.com/gpu.product'] + " x " + labels['nvidia.com/gpu.count']);
+        let used = usingPods.get(node.metadata?.name ?? "")?.reduce((a, b) => gpu(b) + a, 0) ?? 0;
+        doc.push(node.metadata?.name + "\t" + labels['nvidia.com/gpu.product'] + ' (' + used + '/' + labels['nvidia.com/gpu.count'] + ')');
         for (let pod of usingPods.get(node.metadata?.name ?? "")!.sort((a, b) => gpu(b) - gpu(a))) {
             if (0 == gpu(pod))
                 continue;
@@ -93,8 +94,10 @@ export async function whoIsUsingA100() {
         }
         doc.push("");
     }
-    vscode.env.clipboard.writeText(doc.join('\n'));
-    vscode.window.showInformationMessage("Done.");
+    let text = await vscode.window.showTextDocument(vscode.Uri.parse('untitled:gpu-users-' + Date.now()));
+    await text.edit((edit) => edit.insert(new vscode.Position(0, 0), doc.join('\n')));
+    // vscode.env.clipboard.writeText(doc.join('\n'));
+    // vscode.window.showInformationMessage("Done.");
 }
 
 function formatTime(seconds: number) {

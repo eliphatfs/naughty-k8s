@@ -6,6 +6,8 @@
   "engines": {
     "vscode": "^1.76.0"
   },
+  "license": "Apache-2.0",
+  "repository": { "url": "https://github.com/eliphatfs/naughty-k8s", "type": "git" },
   "categories": [
     "Other"
   ],
@@ -79,7 +81,7 @@
       },
       {
         "command": "naughty-k8s.pod.whoIsUsingA100",
-        "title": "Who Is Using A100?"
+        "title": "Who Is Using GPUs?"
       }
     ],
     "menus": {
