@@ -74,9 +74,14 @@ export async function whoIsUsingA100() {
     let usingPods = new Map<string, k8s.V1Pod[]>();
     for (let node of nodes)
         usingPods.set(node.metadata?.name ?? "", []);
+    usingPods.set('Queue', []);
     for (let pod of (await api.make(k8s.CoreV1Api).listPodForAllNamespaces()).body.items)
         if (pod.status?.phase == "Running" && pod.spec?.nodeName)
             usingPods.get(pod.spec?.nodeName)?.push(pod);
+        else if (pod.status?.phase == "Pending") {
+            if (!pod.spec?.nodeName)
+                usingPods.get('Queue')!.push(pod);
+        }
     let doc: string[] = [];
     function gpu(a: k8s.V1Pod) {
         return a.spec?.containers?.reduce((x, v) => x + (parseInt((v.resources?.requests ?? {})['nvidia.com/gpu'] ?? "0")), 0) ?? 0;
@@ -94,6 +99,29 @@ export async function whoIsUsingA100() {
         }
         doc.push("");
     }
+    doc.push("Queued");
+    function gpuNames(pod: k8s.V1Pod): string[] {
+        let names = [];
+        let terms = pod.spec?.affinity?.nodeAffinity?.requiredDuringSchedulingIgnoredDuringExecution?.nodeSelectorTerms ?? [];
+        for (let term of terms) {
+            for (let req of term.matchExpressions ?? []) {
+                if (req.key == 'nvidia.com/gpu.product')
+                    if (req.operator.toLowerCase() == 'in') {
+                        names.push(...req.values ?? []);
+                    }
+            }
+        }
+        return names;
+    }
+    for (let pod of usingPods.get('Queue')!.sort((a, b) => gpu(b) - gpu(a))) {
+        if (0 == gpu(pod))
+            continue;
+        doc.push(
+            formatTime((Date.now() - (pod.metadata?.creationTimestamp?.getTime() ?? Date.now())) / 1000)
+            + "\t" + gpu(pod) + "\t" + pod.metadata?.namespace + "::" + pod.metadata?.name + ' [' + gpuNames(pod).join(', ') + ']'
+        );
+    }
+    doc.push("");
     let text = await vscode.window.showTextDocument(vscode.Uri.parse('untitled:gpu-users-' + Date.now()));
     await text.edit((edit) => edit.insert(new vscode.Position(0, 0), doc.join('\n')));
     // vscode.env.clipboard.writeText(doc.join('\n'));
