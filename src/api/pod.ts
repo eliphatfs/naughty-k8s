@@ -27,6 +27,19 @@ export async function listPods(): Promise<k8s.V1Pod[]> {
 }
 
 
+export async function getPod(podName: string): Promise<k8s.V1Pod> {
+    const k8sApi = api.make(k8s.CoreV1Api);
+    const resp = await k8sApi.readNamespacedPod(podName, api.ns());
+    return resp.body;
+}
+
+
+export async function deletePod(podName: string): Promise<void> {
+    const k8sApi = api.make(k8s.CoreV1Api);
+    await k8sApi.deleteNamespacedPod(podName, api.ns());
+}
+
+
 export async function getLogStream(podName: string) {
     const ps = new stream.PassThrough({ encoding: 'utf-8' });
     const logApi = await new k8s.Log(api.kube()).log(api.ns(), podName, '', ps, {

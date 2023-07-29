@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
-import { listPods, BackedPodCommandStream, getLogStream, describeStream, whoIsUsingA100 } from '../api/pod';
+import { listPods, BackedPodCommandStream, getLogStream, describeStream, whoIsUsingA100, deletePod, getPod } from '../api/pod';
 import { html } from './webviews';
 import { PassThrough } from 'stream';
 import { throttled } from '../utils';
+import { dumpYaml } from '@kubernetes/client-node';
 
 
 function getNameFilterValue(context: vscode.ExtensionContext) {
@@ -180,6 +181,35 @@ class KubernetesTreeProvider implements vscode.TreeDataProvider<PodItem>  {
             }),
             vscode.commands.registerCommand("naughty-k8s.pod.copyname", async (podItem: PodItem) => {
                 await vscode.env.clipboard.writeText(podItem.name);
+            }),
+            vscode.commands.registerCommand("naughty-k8s.pod.delete", async (podItem: PodItem) => {
+                vscode.window
+                    .showInformationMessage(`Are you sure you want to delete '${podItem.name}'?`, "Yes", "No")
+                    .then(answer => {
+                        if (answer === "Yes") {
+                            vscode.window.withProgress({
+                                title: `Deleting ${podItem.name}...`,
+                                location: vscode.ProgressLocation.Notification,
+                                cancellable: false
+                            }, async () => {
+                                await deletePod(podItem.name);
+                                vscode.commands.executeCommand("naughty-k8s.res.refresh");
+                            })
+                        }
+                    })
+            }),
+            vscode.commands.registerCommand("naughty-k8s.pod.spec", async (podItem: PodItem) => {
+                vscode.window.withProgress({
+                    title: `Retrieving ${podItem.name}...`,
+                    location: vscode.ProgressLocation.Notification,
+                    cancellable: false
+                }, async () => {
+                    let spec = dumpYaml(await getPod(podItem.name), { noArrayIndent: true, indent: 2, lineWidth: 102 });
+                    let text = await vscode.window.showTextDocument(
+                        vscode.Uri.parse(`untitled:pod-${podItem.name}-${Date.now()}`)
+                    );
+                    await text.edit((edit) => edit.insert(new vscode.Position(0, 0), spec));
+                });
             }),
             vscode.commands.registerCommand("naughty-k8s.pod.test", async (podItem: PodItem) => {
                 let stream = await new BackedPodCommandStream(podItem.name).open();
