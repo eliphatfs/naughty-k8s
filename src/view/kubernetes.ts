@@ -4,6 +4,8 @@ import { html } from './webviews';
 import { PassThrough } from 'stream';
 import { throttled } from '../utils';
 import { dumpYaml } from '@kubernetes/client-node';
+import { AnsiTerminal } from 'node-ansiterminal';
+import AnsiParser from 'node-ansiparser';
 
 
 function getNameFilterValue(context: vscode.ExtensionContext) {
@@ -77,8 +79,21 @@ class PodItem extends vscode.TreeItem {
     }
 }
 
+function terminalBuffer(terminal: AnsiTerminal) {
+    var s = '';
+    for (var i=0; i < terminal.screen.scrollbuffer.length; ++i) {
+        s += terminal.screen.scrollbuffer[i].toString();
+        s += '\n';
+    }
+    for (var i=0; i < terminal.screen.buffer.length; ++i) {
+        s += terminal.screen.buffer[i].toString();
+        s += '\n';
+    }
+    return s;
+}
+
 class PodLogFollower implements vscode.TextDocumentContentProvider {
-    logs = new Map<string, string[]>();
+    logs = new Map<string, AnsiTerminal>();
     streams = new Map<string, PassThrough>();
 
     constructor(context: vscode.ExtensionContext) {
@@ -106,15 +121,18 @@ class PodLogFollower implements vscode.TextDocumentContentProvider {
         if (!this.logs.has(uriString)) {
             console.log("POD LOG CREATE " + uri.path + " " + uriString);
             let stream = await getLogStream(uri.path);
-            this.logs.set(uriString, []);
+            let term = new AnsiTerminal(512, 64, 1073741823);
+            term.newline_mode = true;
+            this.logs.set(uriString, term);
+            let parser = new AnsiParser(term);
             let fireRefresh = throttled(() => this.onDidChangeEmitter.fire(uri), 50);
             stream.on('data', (chunk: string) => {
-                this.logs.get(uriString)!.push(chunk);
+                parser.parse(chunk);
                 fireRefresh();
             });
             this.streams.set(uriString, stream);
         }
-        return this.logs.get(uriString)!.join('');
+        return terminalBuffer(this.logs.get(uriString)!);
     }
 }
 

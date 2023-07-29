@@ -7,7 +7,10 @@
     "vscode": "^1.76.0"
   },
   "license": "Apache-2.0",
-  "repository": { "url": "https://github.com/eliphatfs/naughty-k8s", "type": "git" },
+  "repository": {
+    "url": "https://github.com/eliphatfs/naughty-k8s",
+    "type": "git"
+  },
   "categories": [
     "Other"
   ],
@@ -196,6 +199,8 @@
     "@kubernetes/client-node": "^0.18.1",
     "@vscode/webview-ui-toolkit": "^1.2.2",
     "axios": "^1.4.0",
+    "node-ansiparser": "^2.2.1",
+    "node-ansiterminal": "^0.2.1-beta",
     "yaml": "^2.3.1"
   }
 }
